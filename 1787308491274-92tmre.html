@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Gesture Drawing Pro</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:#0a0a0a;
+    color:white;
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    text-align:center;
+    padding:20px;
+    min-height:100vh;
+}
+
+h2{
+    margin:20px 0 10px 0;
+    font-size:32px;
+    color:#fff;
+}
+
+.main-container{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:20px;
+}
+
+.video-container{
+    position:relative;
+    width:640px;
+    height:480px;
+    border-radius:15px;
+    overflow:hidden;
+    box-shadow:0 0 30px rgba(0,255,100,0.4);
+    border:2px solid #00ff64;
+}
+
+video,canvas{
+    position:absolute;
+    width:640px;
+    height:480px;
+    left:0;
+    top:0;
+}
+
+video{
+    transform:scaleX(-1);
+}
+
+canvas{
+    transform:scaleX(-1);
+}
+
+#drawingCanvas{
+    cursor:crosshair;
+    z-index:500;
+}
+
+#outputCanvas{
+    z-index:100;
+}
+
+.drawing-mode-indicator{
+    position:absolute;
+    top:10px;
+    left:10px;
+    background:rgba(0,255,100,0.8);
+    color:#000;
+    padding:8px 15px;
+    border-radius:20px;
+    font-weight:bold;
+    font-size:14px;
+    z-index:600;
+    display:none;
+}
+
+.drawing-mode-indicator.active{
+    display:block;
+    animation:pulse 1s infinite;
+}
+
+@keyframes pulse{
+    0%,100%{
+        opacity:1;
+    }
+    50%{
+        opacity:0.6;
+    }
+}
+
+.clear-button{
+    position:absolute;
+    top:10px;
+    right:10px;
+    background:rgba(255,50,100,0.8);
+    color:white;
+    padding:8px 15px;
+    border-radius:20px;
+    border:none;
+    font-weight:bold;
+    cursor:pointer;
+    z-index:600;
+    display:none;
+    font-size:12px;
+}
+
+.clear-button.active{
+    display:block;
+}
+
+.clear-button:hover{
+    background:rgba(255,50,100,1);
+}
+
+/* Status Bar */
+.status-bar{
+    width:640px;
+    background:rgba(0,0,0,0.9);
+    padding:15px;
+    border-radius:10px;
+    border:1px solid #00ff64;
+    color:#00ff64;
+    font-size:14px;
+    font-weight:bold;
+    min-height:50px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+}
+
+.hand-info{
+    font-size:16px;
+}
+
+.gesture-status{
+    font-size:14px;
+    opacity:0.8;
+}
+
+/* Voice Indicator */
+.voice-indicator{
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:rgba(0,150,255,0.9);
+    color:white;
+    padding:12px 25px;
+    border-radius:25px;
+    font-weight:bold;
+    font-size:14px;
+    display:none;
+    z-index:700;
+    animation:slideUp 0.3s ease-out;
+}
+
+.voice-indicator.active{
+    display:block;
+}
+
+@keyframes slideUp{
+    from{
+        transform:translateX(-50%) translateY(50px);
+        opacity:0;
+    }
+    to{
+        transform:translateX(-50%) translateY(0);
+        opacity:1;
+    }
+}
+
+/* I Love You Animation */
+.love-text-container{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    pointer-events:none;
+    z-index:1000;
+}
+
+.love-text{
+    font-size:72px;
+    font-weight:bold;
+    color:#ff1493;
+    text-shadow:0 0 30px #ff1493, 0 0 60px #ff69b4;
+    animation:popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family:'Arial Black', sans-serif;
+    letter-spacing:3px;
+}
+
+@keyframes popIn {
+    0%{
+        transform:scale(0) rotateZ(-10deg);
+        opacity:0;
+    }
+    50%{
+        transform:scale(1.2);
+    }
+    100%{
+        transform:scale(1) rotateZ(0deg);
+        opacity:1;
+    }
+}
+
+@keyframes fadeOut {
+    0%{
+        opacity:1;
+        transform:scale(1);
+    }
+    100%{
+        opacity:0;
+        transform:scale(0.8);
+    }
+}
+
+.love-text.fade{
+    animation:fadeOut 0.8s ease-out forwards;
+}
+
+/* Gesture Legend */
+.gesture-legend{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+    gap:12px;
+    width:640px;
+    margin-top:20px;
+}
+
+.legend-item{
+    background:rgba(255,255,255,0.05);
+    padding:12px;
+    border-radius:8px;
+    border:1px solid rgba(0,255,100,0.3);
+    font-size:12px;
+}
+
+.legend-item .icon{
+    font-size:24px;
+    margin-bottom:5px;
+}
+
+.legend-item .name{
+    font-size:11px;
+    color:#aaa;
+}
+
+.legend-item .desc{
+    font-size:10px;
+    color:#888;
+    margin-top:3px;
+}
+
+.legend-item.active{
+    background:rgba(0,255,100,0.2);
+    border-color:#00ff64;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+</head>
+<body>
+
+<h2>🎯 Gesture Drawing Pro</h2>
+
+<div class="main-container">
+    <div class="video-container">
+        <video class="input_video" autoplay playsinline></video>
+        <canvas id="outputCanvas" class="output_canvas" width="640" height="480"></canvas>
+        <canvas id="drawingCanvas" width="640" height="480"></canvas>
+        
+        <div class="drawing-mode-indicator" id="drawingIndicator">✏️ DRAWING MODE</div>
+        <button class="clear-button" id="clearButton">🗑️ CLEAR</button>
+        <div class="voice-indicator" id="voiceIndicator">🔊 Speaking...</div>
+    </div>
+    
+    <div class="status-bar">
+        <div>
+            <div id="handInfo" class="hand-info">🖐️ 0 Tangan</div>
+            <div id="gestureStatus" class="gesture-status">Siap mendeteksi...</div>
+        </div>
+    </div>
+    
+    <div class="gesture-legend">
+        <div class="legend-item" id="legend-palm">
+            <div class="icon">✋</div>
+            <div class="name">Open Palm</div>
+            <div class="desc">Toggle Drawing</div>
+        </div>
+        <div class="legend-item" id="legend-pointfinger">
+            <div class="icon">☝️</div>
+            <div class="name">Point Finger</div>
+            <div class="desc">Draw Mode</div>
+        </div>
+        <div class="legend-item" id="legend-threefingers">
+            <div class="icon">🖐️</div>
+            <div class="name">3 Fingers</div>
+            <div class="desc">Voice Intro</div>
+        </div>
+        <div class="legend-item" id="legend-peace">
+            <div class="icon">✌️</div>
+            <div class="name">Peace</div>
+            <div class="desc">Blur Kamera</div>
+        </div>
+        <div class="legend-item" id="legend-heart">
+            <div class="icon">🫰</div>
+            <div class="name">Hand Heart</div>
+            <div class="desc">I Love You</div>
+        </div>
+        <div class="legend-item" id="legend-thumbup">
+            <div class="icon">👍</div>
+            <div class="name">Thumbs Up</div>
+            <div class="desc">Good!</div>
+        </div>
+        <div class="legend-item" id="legend-rock">
+            <div class="icon">🤘</div>
+            <div class="name">Rock</div>
+            <div class="desc">Rock On!</div>
+        </div>
+        <div class="legend-item" id="legend-fist">
+            <div class="icon">✊</div>
+            <div class="name">Fist</div>
+            <div class="desc">Power!</div>
+        </div>
+        <div class="legend-item" id="legend-ok">
+            <div class="icon">👌</div>
+            <div class="name">OK Sign</div>
+            <div class="desc">All Good!</div>
+        </div>
+    </div>
+</div>
+
+<div class="love-text-container" id="loveContainer"></div>
+
+<script>
+
+const video=document.querySelector(".input_video");
+const outputCanvas=document.getElementById("outputCanvas");
+const drawingCanvas=document.getElementById("drawingCanvas");
+const outputCtx=outputCanvas.getContext("2d");
+const drawCtx=drawingCanvas.getContext("2d");
+const handInfo=document.getElementById("handInfo");
+const gestureStatus=document.getElementById("gestureStatus");
+const drawingIndicator=document.getElementById("drawingIndicator");
+const clearButton=document.getElementById("clearButton");
+const voiceIndicator=document.getElementById("voiceIndicator");
+const loveContainer=document.getElementById("loveContainer");
+
+let isDrawingMode=false;
+let lastPalmTime=0;
+let lastVoiceTime=0;
+let lastLoveTime=0;
+let isDrawing=false;
+let lastX=0;
+let lastY=0;
+
+// Drawing config
+const brushColor="#ff1493";
+const brushSize=3;
+
+// ===== Distance Function =====
+function dist(a,b){
+    return Math.hypot(a.x-b.x, a.y-b.y);
+}
+
+// ===== Finger Detection =====
+function fingerUp(tip, pip){
+    return tip.y<pip.y;
+}
+
+// ===== Get Hand Bounds =====
+function getHandBounds(landmarks){
+    const xs=landmarks.map(l=>l.x);
+    const ys=landmarks.map(l=>l.y);
+    const minX=Math.min(...xs);
+    const maxX=Math.max(...xs);
+    const minY=Math.min(...ys);
+    const maxY=Math.max(...ys);
+    return {
+        width:maxX-minX,
+        height:maxY-minY,
+        centerX:(minX+maxX)/2,
+        centerY:(minY+maxY)/2
+    };
+}
+
+// ===== GESTURE 1: Open Palm ✋ =====
+function detectOpenPalm(lm){
+    const thumb=fingerUp(lm[4], lm[3]);
+    const index=fingerUp(lm[8], lm[6]);
+    const middle=fingerUp(lm[12], lm[10]);
+    const ring=fingerUp(lm[16], lm[14]);
+    const pinky=fingerUp(lm[20], lm[18]);
+    
+    return thumb && index && middle && ring && pinky;
+}
+
+// ===== GESTURE 2: Point Finger ☝️ =====
+function detectPointFinger(lm){
+    const thumb=!fingerUp(lm[4], lm[3]);
+    const index=fingerUp(lm[8], lm[6]);
+    const middle=!fingerUp(lm[12], lm[10]);
+    const ring=!fingerUp(lm[16], lm[14]);
+    const pinky=!fingerUp(lm[20], lm[18]);
+    
+    return thumb && index && middle && ring && pinky;
+}
+
+// ===== GESTURE 3: 3 Fingers (Index, Middle, Ring UP) =====
+function detectThreeFingers(lm){
+    const thumb=!fingerUp(lm[4], lm[3]);
+    const index=fingerUp(lm[8], lm[6]);
+    const middle=fingerUp(lm[12], lm[10]);
+    const ring=fingerUp(lm[16], lm[14]);
+    const pinky=!fingerUp(lm[20], lm[18]);
+    
+    return thumb && index && middle && ring && pinky;
+}
+
+// ===== GESTURE 4: Peace Sign ✌️ =====
+function detectPeaceSign(lm){
+    const thumb=!fingerUp(lm[4], lm[3]);
+    const index=fingerUp(lm[8], lm[6]);
+    const middle=fingerUp(lm[12], lm[10]);
+    const ring=!fingerUp(lm[16], lm[14]);
+    const pinky=!fingerUp(lm[20], lm[18]);
+    
+    const indexMiddleDist=dist(lm[8], lm[12]);
+    const bounds=getHandBounds(lm);
+    
+    return thumb && index && middle && ring && pinky && indexMiddleDist>bounds.width*0.15;
+}
+
+// ===== GESTURE 5: Hand with Heart 🫰 =====
+function detectHandWithHeart(lm){
+    const thumb=fingerUp(lm[4], lm[3]);
+    const index=fingerUp(lm[8], lm[6]);
+    const middle=!fingerUp(lm[12], lm[10]);
+    const ring=!fingerUp(lm[16], lm[14]);
+    const pinky=!fingerUp(lm[20], lm[18]);
+    
+    const thumbIndexDist=dist(lm[4], lm[8]);
+    const bounds=getHandBounds(lm);
+    
+    return thumb && index && middle && ring && pinky && thumbIndexDist<bounds.width*0.25;
+}
+
+// ===== GESTURE 6: Thumbs Up 👍 =====
+function detectThumbsUp(lm){
+    const thumb=fingerUp(lm[4], lm[3]);
+    const index=!fingerUp(lm[8], lm[6]);
+    const middle=!fingerUp(lm[12], lm[10]);
+    const ring=!fingerUp(lm[16], lm[14]);
+    const pinky=!fingerUp(lm[20], lm[18]);
+    
+    const thumbWristDist=dist(lm[4], lm[0]);
+    const bounds=getHandBounds(lm);
+    
+    return thumb && index && middle && ring && pinky && thumbWristDist>bounds.height*0.6;
+}
+
+// ===== GESTURE 7: Rock 🤘 =====
+function detectRock(lm){
+    const thumb=!fingerUp(lm[4], lm[3]);
+    const index=fingerUp(lm[8], lm[6]);
+    const middle=!fingerUp(lm[12], lm[10]);
+    const ring=!fingerUp(lm[16], lm[14]);
+    const pinky=fingerUp(lm[20], lm[18]);
+    
+    const indexPinkyDist=dist(lm[8], lm[20]);
+    const bounds=getHandBounds(lm);
+    
+    return thumb && index && middle && ring && pinky && indexPinkyDist>bounds.width*0.2;
+}
+
+// ===== GESTURE 8: Fist ✊ =====
+function detectFist(lm){
+    const thumb=!fingerUp(lm[4], lm[3]);
+    const index=!fingerUp(lm[8], lm[6]);
+    const middle=!fingerUp(lm[12], lm[10]);
+    const ring=!fingerUp(lm[16], lm[14]);
+    const pinky=!fingerUp(lm[20], lm[18]);
+    
+    return thumb && index && middle && ring && pinky;
+}
+
+// ===== GESTURE 9: OK Sign 👌 =====
+function detectOKSign(lm){
+    const thumb=!fingerUp(lm[4], lm[3]);
+    const index=!fingerUp(lm[8], lm[6]);
+    const middle=fingerUp(lm[12], lm[10]);
+    const ring=fingerUp(lm[16], lm[14]);
+    const pinky=fingerUp(lm[20], lm[18]);
+    
+    const thumbIndexDist=dist(lm[4], lm[8]);
+    const bounds=getHandBounds(lm);
+    
+    return thumb && index && middle && ring && pinky && thumbIndexDist<bounds.width*0.1;
+}
+
+// ===== Apply Blur =====
+function applyBlur(active){
+    if(active){
+        outputCanvas.classList.add("canvas-blur");
+    } else {
+        outputCanvas.classList.remove("canvas-blur");
+    }
+}
+
+// ===== Toggle Drawing Mode =====
+function toggleDrawingMode(){
+    const now=Date.now();
+    if(now-lastPalmTime<1500) return;
+    lastPalmTime=now;
+    
+    isDrawingMode=!isDrawingMode;
+    
+    if(isDrawingMode){
+        drawingIndicator.classList.add("active");
+        clearButton.classList.add("active");
+        gestureStatus.innerHTML="✏️ DRAWING MODE AKTIF - Telapak lagi untuk keluar";
+    } else {
+        drawingIndicator.classList.remove("active");
+        clearButton.classList.remove("active");
+        gestureStatus.innerHTML="✋ DRAWING MODE SELESAI";
+    }
+}
+
+// ===== Clear Drawing =====
+function clearDrawing(){
+    drawCtx.clearRect(0,0,640,480);
+}
+
+clearButton.addEventListener("click", clearDrawing);
+
+// ===== Play Voice Intro =====
+function playVoiceIntro(){
+    const now=Date.now();
+    if(now-lastVoiceTime<3000) return;
+    lastVoiceTime=now;
+    
+    const text="Perkenalkan Nama saya Kiki Ardiansyah";
+    
+    voiceIndicator.classList.add("active");
+    
+    const utterance=new SpeechSynthesisUtterance(text);
+    utterance.lang="en-US";
+    utterance.rate=1.0;
+    utterance.pitch=1.0;
+    utterance.volume=1.0;
+    
+    utterance.onend=()=>{
+        voiceIndicator.classList.remove("active");
+    };
+    
+    speechSynthesis.speak(utterance);
+    gestureStatus.innerHTML="🔊 VOICE INTRO PLAYING...";
+}
+
+// ===== Show I Love You =====
+function showILoveYou(){
+    const now=Date.now();
+    if(now-lastLoveTime<2500) return;
+    lastLoveTime=now;
+    
+    const text=document.createElement("div");
+    text.className="love-text";
+    text.textContent="💖 I Love You 💖";
+    
+    loveContainer.innerHTML="";
+    loveContainer.appendChild(text);
+    
+    setTimeout(()=>{
+        text.classList.add("fade");
+        setTimeout(()=>text.remove(), 800);
+    }, 2000);
+}
+
+// ===== Drawing Function =====
+function drawLine(x0, y0, x1, y1){
+    drawCtx.strokeStyle=brushColor;
+    drawCtx.lineWidth=brushSize;
+    drawCtx.lineCap="round";
+    drawCtx.lineJoin="round";
+    drawCtx.beginPath();
+    drawCtx.moveTo(x0, y0);
+    drawCtx.lineTo(x1, y1);
+    drawCtx.stroke();
+}
+
+// ===== Draw on Canvas with Finger =====
+function drawFromFinger(lm){
+    if(!isDrawingMode) return;
+    
+    // Gunakan index finger tip untuk drawing
+    const indexTip=lm[8];
+    const x=indexTip.x*640;
+    const y=indexTip.y*480;
+    
+    if(isDrawing){
+        drawLine(lastX, lastY, x, y);
+    }
+    
+    lastX=x;
+    lastY=y;
+    isDrawing=true;
+}
+
+// ===== Update UI =====
+function updateStatus(gesture, handCount){
+    document.querySelectorAll(".legend-item").forEach(el=>el.classList.remove("active"));
+    
+    handInfo.innerHTML=`🖐️ ${handCount} Tangan`;
+    
+    switch(gesture){
+        case "palm":
+            document.getElementById("legend-palm").classList.add("active");
+            break;
+        case "pointfinger":
+            document.getElementById("legend-pointfinger").classList.add("active");
+            break;
+        case "threefingers":
+            document.getElementById("legend-threefingers").classList.add("active");
+            break;
+        case "peace":
+            document.getElementById("legend-peace").classList.add("active");
+            break;
+        case "heart":
+            document.getElementById("legend-heart").classList.add("active");
+            break;
+        case "thumbup":
+            document.getElementById("legend-thumbup").classList.add("active");
+            break;
+        case "rock":
+            document.getElementById("legend-rock").classList.add("active");
+            break;
+        case "fist":
+            document.getElementById("legend-fist").classList.add("active");
+            break;
+        case "ok":
+            document.getElementById("legend-ok").classList.add("active");
+            break;
+    }
+}
+
+// ===== Hand Detection Setup =====
+const hands=new Hands({
+    locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+    maxNumHands:2,
+    modelComplexity:1,
+    minDetectionConfidence:0.6,
+    minTrackingConfidence:0.5
+});
+
+hands.onResults((results)=>{
+    outputCtx.clearRect(0,0,640,480);
+    outputCtx.drawImage(results.image,0,0,640,480);
+    
+    let detectedGesture="none";
+    let handCount=0;
+    
+    isDrawing=false;
+    
+    if(results.multiHandLandmarks && results.multiHandLandmarks.length>0){
+        handCount=results.multiHandLandmarks.length;
+        
+        for(let i=0; i<results.multiHandLandmarks.length; i++){
+            const lm=results.multiHandLandmarks[i];
+            
+            // Draw hand
+            drawConnectors(outputCtx,lm,HAND_CONNECTIONS,{color:"#00ff64",lineWidth:3});
+            drawLandmarks(outputCtx,lm,{color:"#ff1493",lineWidth:2});
+            
+            // Detect gestures (prioritas: deteksi semua tapi yang terakhir yg ter-set sebagai current)
+            if(detectOKSign(lm)){
+                detectedGesture="ok";
+            }
+            if(detectFist(lm)){
+                detectedGesture="fist";
+            }
+            if(detectRock(lm)){
+                detectedGesture="rock";
+            }
+            if(detectThumbsUp(lm)){
+                detectedGesture="thumbup";
+            }
+            if(detectHandWithHeart(lm)){
+                detectedGesture="heart";
+                showILoveYou();
+            }
+            if(detectPeaceSign(lm)){
+                detectedGesture="peace";
+                applyBlur(true);
+            }
+            if(detectThreeFingers(lm)){
+                detectedGesture="threefingers";
+                playVoiceIntro();
+                applyBlur(false);
+            }
+            if(detectPointFinger(lm)){
+                detectedGesture="pointfinger";
+                drawFromFinger(lm);
+                applyBlur(false);
+            }
+            if(detectOpenPalm(lm)){
+                detectedGesture="palm";
+                toggleDrawingMode();
+                applyBlur(false);
+            }
+        }
+    } else {
+        // Tangan hilang - hanya clear drawing flag, JANGAN keluar dari drawing mode
+        // User harus telapak tangan (open palm) untuk keluar
+    }
+    
+    updateStatus(detectedGesture, handCount);
+});
+
+// ===== Camera Start =====
+const camera=new Camera(video,{
+    onFrame:async()=>{
+        await hands.send({image:video});
+    },
+    width:640,
+    height:480
+});
+
+camera.start();
+
+// ===== Cleanup =====
+window.onbeforeunload=()=>{
+    if(speechSynthesis.speaking){
+        speechSynthesis.cancel();
+    }
+};
+
+</script>
+
+</body>
+</html>
