@@ -1,0 +1,11 @@
+{
+  "AimAssist": true,
+  "GlobalMultiplier": 14.8,
+  "AimLock": 14.2,
+  "TrackingSpeed": 9.2,
+  "Stickiness": 0.999999999,
+  "HeadBias": 6.4,
+  "UniformAllWeapons": true,
+  "HipfireLock": 8.2,
+  "PersistentAdhesion": true
+}
