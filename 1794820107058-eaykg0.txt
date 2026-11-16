@@ -1,0 +1,322 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local Config = {
+    TargetName = "PointLevel",
+    FlyHeight = 15,         
+    TimeUp = 0.4,           
+    TimeOver = 0.8,         
+    TimeDown = 0.4,         
+    WaitAtCheckpoint = 1.5, 
+}
+
+local State = {
+    AutoObby = false,
+    UIOpen = true
+}
+
+-- =====================================================================
+-- CAMERA LOCK
+-- =====================================================================
+RunService.RenderStepped:Connect(function()
+    if State.AutoObby then
+        Camera.CameraType = Enum.CameraType.Scriptable
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local camPos = hrp.Position + (hrp.CFrame.LookVector * -25) + Vector3.new(0, 15, 0)
+            Camera.CFrame = CFrame.new(camPos, hrp.Position)
+        end
+    else
+        if Camera.CameraType == Enum.CameraType.Scriptable then
+            Camera.CameraType = Enum.CameraType.Custom
+        end
+    end
+end)
+
+-- =====================================================================
+-- UI SETUP & LOGGER
+-- =====================================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ObbyTweenUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.Size = UDim2.new(0, 130, 0, 35)
+ToggleBtn.Position = UDim2.new(0, 20, 0, 20)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+ToggleBtn.Text = "CLOSE UI"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 13
+ToggleBtn.BorderSizePixel = 0
+
+local TCorner = Instance.new("UICorner")
+TCorner.CornerRadius = UDim.new(0, 8)
+TCorner.Parent = ToggleBtn
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 280, 0, 260)
+MainFrame.Position = UDim2.new(0, 20, 0, 65)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = true
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local MCorner = Instance.new("UICorner")
+MCorner.CornerRadius = UDim.new(0, 10)
+MCorner.Parent = MainFrame
+
+local MStroke = Instance.new("UIStroke")
+MStroke.Color = Color3.fromRGB(50, 50, 60)
+MStroke.Thickness = 1
+MStroke.Parent = MainFrame
+
+local AutoBtn = Instance.new("TextButton")
+AutoBtn.Name = "AutoBtn"
+AutoBtn.Parent = MainFrame
+AutoBtn.Size = UDim2.new(1, -20, 0, 45)
+AutoBtn.Position = UDim2.new(0, 10, 0, 10)
+AutoBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+AutoBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+AutoBtn.Font = Enum.Font.GothamBold
+AutoBtn.TextSize = 14
+AutoBtn.Text = "AUTO OBBY: OFF"
+AutoBtn.BorderSizePixel = 0
+
+local ACorner = Instance.new("UICorner")
+ACorner.CornerRadius = UDim.new(0, 6)
+ACorner.Parent = AutoBtn
+
+-- Log Frame
+local LogFrame = Instance.new("ScrollingFrame")
+LogFrame.Parent = MainFrame
+LogFrame.Size = UDim2.new(1, -20, 0, 170)
+LogFrame.Position = UDim2.new(0, 10, 0, 65)
+LogFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+LogFrame.BorderSizePixel = 0
+LogFrame.ScrollBarThickness = 4
+LogFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+LogFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local LCorner = Instance.new("UICorner")
+LCorner.CornerRadius = UDim.new(0, 6)
+LCorner.Parent = LogFrame
+
+local LogLayout = Instance.new("UIListLayout")
+LogLayout.Parent = LogFrame
+LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
+LogLayout.Padding = UDim.new(0, 2)
+
+local LogPad = Instance.new("UIPadding")
+LogPad.Parent = LogFrame
+LogPad.PaddingTop = UDim.new(0, 5)
+LogPad.PaddingLeft = UDim.new(0, 5)
+
+local function addLog(text, color)
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = LogFrame
+    lbl.Size = UDim2.new(1, 0, 0, 16)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "> " .. text
+    lbl.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    lbl.Font = Enum.Font.Code
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    task.defer(function()
+        LogFrame.CanvasPosition = Vector2.new(0, LogLayout.AbsoluteContentSize.Y)
+    end)
+end
+
+-- NOCLIP
+local noclipConn = nil
+local function toggleNoclip(state)
+    if state then
+        if not noclipConn then
+            noclipConn = RunService.Stepped:Connect(function()
+                if LocalPlayer.Character then
+                    for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if v:IsA("BasePart") then v.CanCollide = false end
+                    end
+                end
+            end)
+        end
+    else
+        if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+        if LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.CanCollide = true end
+        end
+    end
+end
+
+-- =====================================================================
+-- STRICT SORTING (URUT DARI BAWAH KE ATAS / SPIRAL)
+-- =====================================================================
+local function buildStrictPath()
+    local points = {}
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v.Name == Config.TargetName and v:IsA("BasePart") then
+            table.insert(points, v)
+        end
+    end
+
+    if #points == 0 then return {} end
+
+    -- 1. Sortir berdasarkan Ketinggian (Y). Obbies selalu naik ke atas.
+    -- 2. Kalau ketinggiannya sama (rata), sortir berdasarkan jarak dari Spawn.
+    local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+    local origin = spawn and spawn.Position or Vector3.new(0, 0, 0)
+
+    table.sort(points, function(a, b)
+        -- Selisih tinggi minimal 2 stud biar dianggap beda tingkat
+        if math.abs(a.Position.Y - b.Position.Y) > 2 then
+            return a.Position.Y < b.Position.Y
+        else
+            -- Kalau tingginya sama, urutkan berdasarkan jarak dari Spawn (maju)
+            return (a.Position - origin).Magnitude < (b.Position - origin).Magnitude
+        end
+    end)
+
+    return points
+end
+
+-- =====================================================================
+-- MAIN SEQUENTIAL LOGIC
+-- =====================================================================
+local function startAutoObby()
+    task.spawn(function()
+        local path = {}
+        local currentIndex = 1
+        
+        while true do
+            task.wait(0.5)
+            if not State.AutoObby then
+                toggleNoclip(false)
+                currentIndex = 1 -- Reset index kalau dimatiin
+                continue 
+            end
+            
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            
+            if not char or not hum or hum.Health <= 0 then
+                addLog("Nunggu respawn...", Color3.fromRGB(255, 200, 0))
+                if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    LocalPlayer.CharacterAdded:Wait()
+                end
+                task.wait(1)
+                continue
+            end
+            
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then continue end
+            
+            -- Kalau path belum dibikin, bikin dulu (cuma sekali pas baru nyala)
+            if #path == 0 then
+                path = buildStrictPath()
+                addLog("Berhasil ngurutin " .. #path .. " CP (1 s/d " .. #path .. ")", Color3.fromRGB(0, 255, 255))
+                
+                -- Cari posisi lo sekarang ada di urutan berapa, biar ga ngulang dari 1
+                local minDist = math.huge
+                for i, p in ipairs(path) do
+                    local d = (p.Position - hrp.Position).Magnitude
+                    if d < minDist then
+                        minDist = d
+                        currentIndex = i
+                    end
+                end
+                addLog("Memulai dari CP ke-" .. currentIndex, Color3.fromRGB(0, 255, 255))
+            end
+            
+            -- LOGIKA KAKU: Cuma jalan maju, ga pernah nge-scan ulang
+            if currentIndex > #path then
+                addLog("Semua CP Selesai!", Color3.fromRGB(0, 255, 100))
+                State.AutoObby = false
+                toggleNoclip(false)
+                hum.WalkSpeed = 16
+                AutoBtn.Text = "AUTO OBBY: FINISH!"
+                AutoBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
+                continue
+            end
+            
+            local targetPart = path[currentIndex]
+            
+            -- Kalau part belum ke-load (Streaming), tunggu di sini
+            if not targetPart or not targetPart.Parent then
+                addLog("Nunggu CP ke-" .. currentIndex .. " muncul...", Color3.fromRGB(255, 100, 100))
+                task.wait(1)
+                continue
+            end
+            
+            toggleNoclip(true)
+            hum.WalkSpeed = 0
+            
+            -- Hitung posisi target (Puncak part)
+            local topY = targetPart.Position.Y + (targetPart.Size.Y / 2)
+            local targetPos = Vector3.new(targetPart.Position.X, topY + 3, targetPart.Position.Z)
+            
+            addLog("Ke CP ke-" .. currentIndex, Color3.fromRGB(150, 200, 255))
+            
+            -- 1. NAIK KE ATAS
+            local upPos = hrp.Position + Vector3.new(0, Config.FlyHeight, 0)
+            local tweenUp = TweenService:Create(hrp, TweenInfo.new(Config.TimeUp, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(upPos)})
+            tweenUp:Play()
+            tweenUp.Completed:Wait()
+            
+            -- 2. TERBANG KE ATAS TARGET
+            local flyPos = Vector3.new(targetPos.X, upPos.Y, targetPos.Z)
+            local lookDir = (targetPart.Position - hrp.Position).Unit
+            local tweenOver = TweenService:Create(hrp, TweenInfo.new(Config.TimeOver, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = CFrame.lookAt(flyPos, flyPos + lookDir)})
+            tweenOver:Play()
+            tweenOver.Completed:Wait()
+            
+            -- 3. TURUN KE PART
+            local tweenDown = TweenService:Create(hrp, TweenInfo.new(Config.TimeDown, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {CFrame = CFrame.lookAt(targetPos, targetPos + lookDir)})
+            tweenDown:Play()
+            tweenDown.Completed:Wait()
+            
+            addLog("Sampe CP ke-" .. currentIndex, Color3.fromRGB(80, 255, 80))
+            
+            -- Maju ke CP berikutnya
+            currentIndex = currentIndex + 1
+            
+            -- Jeda nginjek part
+            task.wait(Config.WaitAtCheckpoint)
+        end
+    end)
+end
+
+-- Logic UI
+ToggleBtn.MouseButton1Click:Connect(function()
+    State.UIOpen = not State.UIOpen
+    MainFrame.Visible = State.UIOpen
+    ToggleBtn.Text = State.UIOpen and "CLOSE UI" or "OPEN UI"
+end)
+
+AutoBtn.MouseButton1Click:Connect(function()
+    State.AutoObby = not State.AutoObby
+    if State.AutoObby then
+        AutoBtn.Text = "AUTO OBBY: ON"
+        AutoBtn.TextColor3 = Color3.fromRGB(80, 255, 80)
+        addLog("Started! Ngurutin CP...", Color3.fromRGB(80, 255, 80))
+    else
+        AutoBtn.Text = "AUTO OBBY: OFF"
+        AutoBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+        addLog("Stopped.", Color3.fromRGB(255, 80, 80))
+        toggleNoclip(false)
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then char.Humanoid.WalkSpeed = 16 end
+    end
+end)
+
+startAutoObby()
